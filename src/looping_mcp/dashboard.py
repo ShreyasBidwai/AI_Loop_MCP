@@ -143,7 +143,12 @@ function renderLive(s){
   const statusColor={running:'#185fa5',done:'#3b6d11',escalated:'#a32d2d',
     blocked_gate:'#854f0b',stopped:'#6b6a64'}[s.status]||'#6b6a64';
   const el=document.getElementById('live');
+  const p=s._project||{};
+  if(p.name) document.title=p.name+' · looping agent';
   el.innerHTML=`
+  ${p.name?`<div class=card style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 16px">
+    <div><span class=mono>PROJECT</span> <b>${esc(p.name)}</b>${p.repo?'':' <span class=mono>(not a git repo)</span>'}</div>
+    <div class=mono title="${esc(p.path)}">${esc(p.remote||p.path)}</div></div>`:''}
   <div style="margin-bottom:12px">
     <div class=mono>END GOAL</div>
     <div style="font-size:18px;font-weight:600">${esc(s.goal)||'—'}</div>
@@ -200,11 +205,31 @@ tick(); setInterval(tick,1500);
 </script></body></html>"""
 
 
+_proj_cache: dict[str, dict] = {}
+
+
+def project_info() -> dict:
+    """Which project this dashboard is for — derived from the working directory
+    (the IDE-launched server runs in the target project). Cached per cwd so we
+    don't shell out to git on every poll. No AI: just the repo root name + path."""
+    cwd = os.getcwd()
+    if cwd not in _proj_cache:
+        top = gitops.toplevel() or cwd
+        _proj_cache[cwd] = {
+            "name": os.path.basename(top.rstrip("/")) or top,
+            "path": top,
+            "repo": gitops.is_repo(),
+            "remote": gitops.remote_url(),
+        }
+    return _proj_cache[cwd]
+
+
 def _state_payload() -> bytes:
     """State plus the governor's real caps, so the budget bar matches config."""
     data = asdict(st.load())
     data["_max_est_tokens"] = governor.MAX_EST_TOKENS
     data["_max_turns"] = governor.MAX_TURNS
+    data["_project"] = project_info()
     return json.dumps(data).encode()
 
 

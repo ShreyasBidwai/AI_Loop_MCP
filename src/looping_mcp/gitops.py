@@ -37,6 +37,18 @@ def current_branch(cwd: str | None = None) -> str:
     return out.strip() if ok else ""
 
 
+def toplevel(cwd: str | None = None) -> str:
+    """Absolute path of the repo root, or "" if not in a repo."""
+    ok, out = _git(["rev-parse", "--show-toplevel"], cwd)
+    return out.strip() if ok else ""
+
+
+def remote_url(cwd: str | None = None) -> str:
+    """origin's URL, or "" if there's no origin / not a repo."""
+    ok, out = _git(["remote", "get-url", "origin"], cwd)
+    return out.strip() if ok else ""
+
+
 def is_clean(cwd: str | None = None) -> bool:
     ok, out = _git(["status", "--porcelain"], cwd)
     return ok and out.strip() == ""

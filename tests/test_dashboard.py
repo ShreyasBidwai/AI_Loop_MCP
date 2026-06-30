@@ -117,6 +117,21 @@ def test_control_panel_markup_present(live_server):
     assert "key!==controlKey" in html
 
 
+def test_state_api_reports_which_project(live_server):
+    code, body = _get(live_server + "/api/state")
+    proj = json.loads(body)["_project"]
+    # derived from the working dir (the looping_MCP repo while tests run here)
+    assert proj["path"] and proj["name"]
+    assert proj["name"] == proj["path"].rstrip("/").split("/")[-1]
+    assert isinstance(proj["repo"], bool)
+
+
+def test_page_renders_project_banner(live_server):
+    _, html = _get(live_server + "/")
+    assert "PROJECT" in html
+    assert "document.title=p.name" in html       # tab title shows the project
+
+
 def test_propose_endpoint_safe_goal(live_server):
     code, out = _post(live_server + "/api/propose",
                       {"goal": "change the footer copyright year to 2026"})

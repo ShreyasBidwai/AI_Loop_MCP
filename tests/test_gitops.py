@@ -80,3 +80,16 @@ def test_merge_conflict_aborts_and_stays_on_branch(repo):
 def test_merge_without_branch_is_rejected(repo):
     ok, detail = gitops.merge("", "main", "x", str(repo))
     assert ok is False and "no task branch" in detail
+
+
+@pytest.mark.gitrepo
+def test_toplevel_and_remote(repo):
+    assert gitops.toplevel(str(repo)) == str(repo.resolve())
+    assert gitops.remote_url(str(repo)) == ""        # no origin configured
+    _git(["remote", "add", "origin", "https://example.com/x.git"], repo)
+    assert gitops.remote_url(str(repo)) == "https://example.com/x.git"
+
+
+@pytest.mark.gitrepo
+def test_toplevel_empty_outside_repo(tmp_path):
+    assert gitops.toplevel(str(tmp_path)) == ""
