@@ -48,6 +48,17 @@ The watch dashboard comes up at <http://127.0.0.1:3000>.
 | `loopai dashboard` | **frontend only**, no stdio — open the control panel by hand, Ctrl-C to stop |
 | `loopai register` | register with Claude Code for the current project |
 
+> **`loopai` lives in the project's `.venv`, not on your global PATH.** After
+> `uv sync`, invoke it one of these ways:
+> - `uv run loopai …` — from the looping_MCP folder, or
+> - `source .venv/bin/activate` then `loopai …`, or
+> - by absolute path from anywhere: `/abs/looping_MCP/.venv/bin/loopai …`
+>   (add that dir to PATH, or `ln -s` it into `~/.local/bin`, for a bare `loopai`).
+>
+> `loopai register` writes an absolute-path launch command, so the IDE can start
+> the server with no PATH/uv dependency — run it from your **target project** dir
+> (that's the project the registration is scoped to).
+
 ### Running it by hand (to watch the dashboard)
 
 Use **`loopai dashboard`** — it serves the control panel with no stdio, so the

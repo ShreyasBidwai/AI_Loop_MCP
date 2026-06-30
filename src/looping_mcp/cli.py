@@ -40,13 +40,23 @@ def _dashboard_only() -> None:
     signal.pause()   # sleep until SIGINT/SIGTERM; no busy loop
 
 
+def _launch_argv() -> list[str]:
+    """How the IDE should start the server. Prefer the venv's console script
+    (absolute path — needs neither PATH nor uv, runs in the IDE's project dir);
+    fall back to `uv run` if the venv isn't built yet."""
+    bindir = "Scripts" if os.name == "nt" else "bin"
+    script = PKG_ROOT / ".venv" / bindir / "loopai"
+    if script.exists():
+        return [str(script), "serve"]
+    return ["uv", "run", "--project", str(PKG_ROOT), "loopai", "serve"]
+
+
 def _register() -> int:
     """Register with Claude Code for the project in the CURRENT directory. The
-    server is launched with --project pinned to this package, so it uses this
-    venv while running in (and verifying against) the caller's project."""
+    server is launched from this package's venv, so it uses these deps while
+    running in (and verifying against) the caller's project."""
     target = os.getcwd()
-    cmd = ["claude", "mcp", "add", "looping-agent", "--",
-           "uv", "run", "--project", str(PKG_ROOT), "loopai", "serve"]
+    cmd = ["claude", "mcp", "add", "looping-agent", "--", *_launch_argv()]
     try:
         subprocess.run(cmd, check=True)
         print(f"[loopai] registered 'looping-agent' for project: {target}", file=sys.stderr)
