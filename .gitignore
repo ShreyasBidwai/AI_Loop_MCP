@@ -1,0 +1,12 @@
+# runtime state (written by the tools; the dashboard reads it)
+.looping_state.json
+
+# env
+.env
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/

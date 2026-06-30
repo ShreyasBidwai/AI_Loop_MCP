@@ -1,0 +1,24 @@
+[project]
+name = "looping-agent-mcp"
+version = "0.1.0"
+description = "MCP server that drives the IDE agent in a verified goal loop"
+requires-python = ">=3.10"
+dependencies = ["mcp>=1.2.0"]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[project.optional-dependencies]
+# Optional LLM drafting for the classifier/criteria. Falls back to deterministic
+# stubs when absent — see classifier.py / criteria.py.
+llm = ["anthropic>=0.40"]
+
+[project.scripts]
+looping-mcp = "looping_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/looping_mcp"]

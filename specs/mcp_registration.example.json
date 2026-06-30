@@ -1,0 +1,9 @@
+{
+  "_comment": "Copy this to .mcp.json (Claude Code) or your IDE's MCP config to register the server. See specs/tool_contract.md for per-IDE paths.",
+  "mcpServers": {
+    "looping-agent": {
+      "command": "uv",
+      "args": ["run", "--directory", "/Users/mac01/dev/looping_MCP", "looping-mcp"]
+    }
+  }
+}
