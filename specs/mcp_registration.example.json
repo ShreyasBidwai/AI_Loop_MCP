@@ -1,9 +1,9 @@
 {
-  "_comment": "Copy this to .mcp.json (Claude Code) or your IDE's MCP config to register the server. See specs/tool_contract.md for per-IDE paths.",
+  "_comment": "Copy to .mcp.json (Claude Code) or your IDE's MCP config. Or just run `loopai register` from your project. '--project' pins this package's venv while the server runs in (and verifies against) the IDE's project dir. See specs/tool_contract.md.",
   "mcpServers": {
     "looping-agent": {
       "command": "uv",
-      "args": ["run", "--directory", "/Users/mac01/dev/looping_MCP", "looping-mcp"]
+      "args": ["run", "--project", "/ABS/PATH/TO/looping_MCP", "loopai", "serve"]
     }
   }
 }

@@ -32,20 +32,28 @@ repo. Use `--project` (selects this package's venv) rather than `--directory`
 (which would also change the cwd to here):
 
 ```bash
-# run this from your target project's root:
-claude mcp add looping-agent -- uv run --project /path/to/looping_MCP looping-mcp
+# run this from your target project's root — registers + pins this package:
+loopai register
+# (equivalent to: claude mcp add looping-agent -- uv run --project /path/to/looping_MCP loopai serve)
 ```
 
 The IDE starts it, speaks JSON-RPC over stdio, and stops it by closing stdin.
 The watch dashboard comes up at <http://127.0.0.1:3000>.
 
+### The `loopai` command
+
+| command | what it does |
+|---|---|
+| `loopai` / `loopai serve` | MCP server (backend) **+** dashboard (frontend) — what the IDE launches |
+| `loopai dashboard` | **frontend only**, no stdio — open the control panel by hand, Ctrl-C to stop |
+| `loopai register` | register with Claude Code for the current project |
+
 ### Running it by hand (to watch the dashboard)
 
-`uv run looping-mcp` works, but it's a **stdio server**: that terminal becomes its
-JSON-RPC input. Don't type shell commands into it — anything you type is parsed as
-a protocol message and rejected (`Invalid JSON…`). Open the dashboard URL in a
-browser, leave the terminal alone, and press **Ctrl-C** to stop it (clean exit;
-use a *separate* terminal for other commands).
+Use **`loopai dashboard`** — it serves the control panel with no stdio, so the
+terminal stays a normal terminal (just press Ctrl-C to stop). Avoid `loopai serve`
+by hand: that's a **stdio server**, so the terminal becomes its JSON-RPC input and
+anything you type is rejected as a protocol message.
 
 > Note: `stdout` is reserved for the JSON-RPC channel — all diagnostics go to `stderr`.
 
