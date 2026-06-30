@@ -13,7 +13,8 @@ STATE_PATH = Path(".looping_state.json")
 _lock = threading.Lock()
 
 Status = Literal["idle", "proposing", "awaiting_confirm", "running",
-                 "blocked_gate", "escalated", "done", "stopped", "failed"]
+                 "blocked_gate", "ready_to_merge", "merged",
+                 "escalated", "done", "stopped", "failed"]
 
 
 @dataclass
@@ -31,6 +32,7 @@ class Gate:
     action: str                     # e.g. "php artisan migrate --env=staging"
     reason: str
     decided: Optional[bool] = None  # None=pending, True=approved, False=rejected
+    kind: str = "action"            # "action" (generic) | "merge" (green merge gate)
 
 
 @dataclass
@@ -40,6 +42,10 @@ class RunState:
     risk: str = "unknown"           # low / medium / high
     lane: str = "unknown"           # auto / developer
     criteria: list[Criterion] = field(default_factory=list)
+    # branch-per-task (empty when the project isn't a git repo):
+    branch: str = ""                # the task branch work happens on
+    base: str = ""                  # the branch it merges back into
+    merge_result: Optional[dict] = None   # {ok: bool, detail: str} after a merge attempt
     # real, measured counters (safe to show live):
     turns: int = 0
     actions: int = 0

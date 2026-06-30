@@ -9,7 +9,7 @@ import os, sys, time, signal, uuid
 from mcp.server.fastmcp import FastMCP
 
 from . import state as st
-from . import classifier, criteria, checker, governor, protocol, dashboard, escalation
+from . import classifier, criteria, checker, governor, protocol, dashboard, escalation, gitops
 
 mcp = FastMCP("looping-agent")
 
@@ -110,6 +110,20 @@ def confirm(edited_criteria: list[dict] | None = None) -> dict:
     s.status = "running"
     s.started_at = time.time()
     s.turns = 0
+
+    # Branch-per-task: cut a fresh branch off the current one so the agent's work
+    # is isolated until the manager approves the merge. Skipped (gracefully) when
+    # the project isn't a git repo.
+    if gitops.is_repo():
+        s.base = gitops.current_branch()
+        branch = gitops.slug(s.goal)
+        ok, detail = gitops.create_branch(branch)
+        if ok:
+            s.branch = branch
+            s.log("git", f"working on branch {branch} (base {s.base})")
+        else:
+            s.log("git", f"could not create task branch: {detail[:160]}")
+
     s.log("manager", f"criteria confirmed ({len(s.criteria)}) — run started")
     st.save(s)
     return {"kickoff_prompt": protocol.assemble_kickoff(s)}
@@ -132,6 +146,8 @@ def get_next_action() -> dict:
         return {"directive": "STOP", "reason": "run already stopped — halt."}
     if s.status == "done":
         return {"directive": "STOP", "reason": "run already verified DONE — halt."}
+    if s.status == "merged":
+        return {"directive": "STOP", "reason": f"task branch merged into {s.base} — halt."}
     if s.gate and s.gate.decided is None:
         return {"directive": "WAIT",
                 "reason": f"human gate pending: {s.gate.action}",
@@ -184,9 +200,9 @@ def report_result(summary: str, proof: dict | None = None) -> dict:
     for browser/manual criteria."""
     s = st.load()
 
-    # After a halt the loop is closed. Never hand back a "do not stop" standing
-    # order that would contradict the STOP/ESCALATE the agent was already given.
-    if s.status in ("stopped", "escalated"):
+    # After a halt — or once green and awaiting/after merge — the loop is closed.
+    # Never hand back a "do not stop" standing order that contradicts that.
+    if s.status in ("stopped", "escalated", "ready_to_merge", "merged"):
         return {"status": "HALTED",
                 "reason": f"run is {s.status}; the loop is closed — do not continue."}
 
@@ -195,23 +211,44 @@ def report_result(summary: str, proof: dict | None = None) -> dict:
     s.log("agent", summary[:160])
 
     verdict = checker.evaluate(s, proof)
-    st.save(s)
 
     if verdict["status"] == "DONE":
-        s.status = "done"; s.log("verifier", "all criteria pass — DONE"); st.save(s)
-        return {"status": "DONE",
-                "message": "Verified complete. Stop looping."}
+        return _finalize_green(s)
+    st.save(s)
     return {"status": "FAIL",
             "failing": verdict["failing"],
             "standing_order": protocol.standing_order(s)}
 
 
+def _finalize_green(s: st.RunState) -> dict:
+    """All criteria pass. On a git project, raise a merge gate and ask the manager
+    on the dashboard — the run isn't truly done until the task branch is merged.
+    Off git, it's a plain DONE."""
+    if s.branch and s.base:
+        s.status = "ready_to_merge"
+        s.gate = st.Gate(kind="merge",
+                         action=f"merge {s.branch} into {s.base}",
+                         reason="all acceptance criteria pass")
+        s.log("verifier", f"all criteria pass — awaiting merge approval ({s.branch} → {s.base})")
+        st.save(s)
+        return {"status": "DONE",
+                "message": f"All criteria pass. Awaiting merge approval on the "
+                           f"dashboard ({s.branch} → {s.base}). Stop looping."}
+    s.status = "done"
+    s.log("verifier", "all criteria pass — DONE")
+    st.save(s)
+    return {"status": "DONE", "message": "Verified complete. Stop looping."}
+
+
 @mcp.tool()
 def check_done() -> dict:
     """Explicit verifier call. Same authority as report_result's check — DONE only
-    comes from here."""
+    comes from here. When it goes green on a git project, a merge gate is raised."""
     s = st.load()
     verdict = checker.evaluate(s)
+    if verdict["status"] == "DONE" and s.status not in ("merged", "ready_to_merge"):
+        _finalize_green(s)
+        return {"status": "DONE", "failing": []}
     st.save(s)
     return verdict
 

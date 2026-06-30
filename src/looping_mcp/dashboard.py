@@ -18,7 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from dataclasses import asdict
 
 from . import state as st
-from . import governor
+from . import governor, gitops
 
 PORT = int(os.getenv("DASHBOARD_PORT", "3000"))
 
@@ -123,6 +123,7 @@ function renderControl(s){
     </div>`;
     return;
   }
+  if(s.status==='ready_to_merge'){ c.innerHTML=''; return; }  // the merge card below is the focus
   // idle / done / stopped / escalated → offer a new goal
   const prior = s.goal ? `<div class=mono style="margin-bottom:8px">last goal: ${esc(s.goal)} · ${s.status}</div>`:'';
   c.innerHTML=`<div class=card>
@@ -149,6 +150,7 @@ function renderLive(s){
     <div style="margin-top:8px">
       <span class=pill style="background:#eef3fb;color:${statusColor}">${s.status} · turn ${s.turns}</span>
       <span class=pill style="background:#fbf1e0;color:#854f0b">${s.lane} lane · ${s.risk}</span>
+      ${s.branch?`<span class=pill style="background:#eef6e6;color:#3b6d11">⎇ ${esc(s.branch)} → ${esc(s.base)}</span>`:''}
     </div></div>
   <div class="row">
     ${metric('criteria',passing+' / '+total)}${metric('turns',s.turns)}
@@ -161,11 +163,19 @@ function renderLive(s){
   ${s.escalation?`<div class=card style="border-color:#a32d2d;border-width:2px">
     <h3 style="color:#a32d2d">⚠ needs a developer</h3>
     <div>${esc(s.escalation.reason)}</div><div class=mono>trigger: ${esc(s.escalation.trigger)}</div></div>`:''}
-  ${s.gate&&s.gate.decided===null?`<div class=card style="border-color:#854f0b;border-width:2px">
+  ${s.gate&&s.gate.decided===null&&s.gate.kind==='merge'?`<div class=card style="border-color:#3b6d11;border-width:2px">
+    <h3 style="color:#3b6d11">✅ all criteria pass — merge?</h3>
+    <div>Everything is green. Merge <span class=mono>${esc(s.branch)}</span> into <span class=mono>${esc(s.base)}</span>?</div>
+    <div style="margin-top:8px"><button class=ok onclick="decide('approve')">Merge</button>
+    <button class=no onclick="decide('reject')">Not yet</button></div></div>`:''}
+  ${s.gate&&s.gate.decided===null&&s.gate.kind!=='merge'?`<div class=card style="border-color:#854f0b;border-width:2px">
     <h3 style="color:#854f0b">✋ human gate — approval needed</h3><div>${esc(s.gate.reason)}</div>
     <div class=mono style="margin:6px 0">${esc(s.gate.action)}</div>
     <button class=ok onclick="decide('approve')">Approve</button>
     <button class=no onclick="decide('reject')">Reject</button></div>`:''}
+  ${s.merge_result?`<div class=card style="border-color:${s.merge_result.ok?'#3b6d11':'#a32d2d'}">
+    <h3 style="color:${s.merge_result.ok?'#3b6d11':'#a32d2d'}">${s.merge_result.ok?'merged ✓':'merge failed'}</h3>
+    <div class=mono>${esc(s.merge_result.detail)}</div></div>`:''}
   ${total?`<div class="card"><h3>acceptance criteria</h3>
     ${s.criteria.map(c=>`<div class=crit><span style="color:${
       c.status==='passing'?'#3b6d11':c.status==='failing'?'#a32d2d':'#6b6a64'}">${
@@ -199,14 +209,33 @@ def _state_payload() -> bytes:
 
 
 def decide_gate(approve: bool) -> bool:
-    """Manager's verdict on a pending gate. Resumes the run either way; a rejected
-    action is simply one the agent must now plan around. Returns True if applied."""
+    """Manager's verdict on a pending gate. Returns True if applied.
+
+    A generic (request_gate) gate just resumes the run. A MERGE gate, on approval,
+    runs the actual `git merge` here — that's the green "should I merge?" decision.
+    A rejected merge leaves the work on its task branch for a human to handle."""
     s = st.load()
     if not (s.gate and s.gate.decided is None):
         return False
-    s.gate.decided = approve
+    gate = s.gate
+    gate.decided = approve
+
+    if gate.kind == "merge":
+        s.gate = None
+        if approve:
+            ok, detail = gitops.merge(s.branch, s.base, s.goal)
+            s.merge_result = {"ok": ok, "detail": detail}
+            s.status = "merged" if ok else "done"
+            s.log("git", detail if ok else f"merge failed: {detail[:160]}")
+        else:
+            s.status = "done"
+            s.log("manager", f"merge rejected — work left on {s.branch}")
+        st.save(s)
+        return True
+
+    # generic action gate
     s.status = "running"
-    s.log("manager", f"gate {'approved' if approve else 'rejected'}: {s.gate.action}")
+    s.log("manager", f"gate {'approved' if approve else 'rejected'}: {gate.action}")
     st.save(s)
     return True
 

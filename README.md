@@ -17,6 +17,16 @@ An MCP server that turns a manager's plain-English goal into a **verified, loope
 5. Three escalation triggers → one channel: **too risky**, **can't define done**, **stuck**. Each carries a reason + handoff.
 6. Live counters show **real** numbers (turns, actions, criteria, elapsed). Token/budget is an **estimate**, labelled as such.
 
+## Branch-per-task & the merge gate
+
+On a git project, each task is isolated and merged only on the manager's say-so:
+
+1. `confirm` cuts a fresh task branch (`loop/<slug>-<hash>`) off the current branch (the *base*); the agent does all its work there.
+2. When **every** criterion goes green, the run doesn't silently finish — it enters `ready_to_merge` and the dashboard shows **"✅ all criteria pass — merge `branch` → `base`?"**
+3. The manager clicks **Merge** (or **Not yet**). On approve, the server commits any pending work and runs `git merge --no-ff`; a conflict aborts cleanly and leaves the work on the task branch. On reject, the work stays on the branch for a human.
+
+Off git (not a repo), it's a plain `DONE` with no branch or merge gate.
+
 ## Run
 
 > New here? **[`SETUP.md`](SETUP.md)** has the full copy-paste setup for a fresh machine.

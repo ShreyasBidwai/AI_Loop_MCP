@@ -59,8 +59,14 @@ def assemble_kickoff(s: RunState) -> str:
     """Full framed prompt the agent is started with = spine + slots.
     Contains the complete locked spine plus this run's goal and criteria."""
     crit = "\n".join(f"  - {c.text}" for c in s.criteria)
+    branch_line = ""
+    if s.branch:
+        branch_line = (f"BRANCH: you are on task branch '{s.branch}' (base '{s.base}'). "
+                       f"Do your work and commit it here; when all criteria pass the "
+                       f"manager approves the merge on the dashboard — do NOT merge yourself.\n")
     return (f"{LOCKED_SPINE}\n"
             f"--- THIS RUN ---\n"
             f"END GOAL: {s.goal}\n"
+            f"{branch_line}"
             f"ACCEPTANCE CRITERIA (done = all pass):\n{crit}\n\n"
             f"Begin by calling get_next_action.")
