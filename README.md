@@ -19,10 +19,12 @@ An MCP server that turns a manager's plain-English goal into a **verified, loope
 
 ## Run
 
+> New here? **[`SETUP.md`](SETUP.md)** has the full copy-paste setup for a fresh machine.
+
 ```bash
 uv sync                  # creates the venv + installs deps
 cp .env.example .env     # optional: tune caps / pacing / LLM drafting
-uv run pytest            # 66 tests; all green
+uv run pytest            # 88 tests; all green
 ```
 
 **The server is meant to be launched by your IDE, not by hand.** Register it from
